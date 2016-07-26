@@ -1,2 +1,3 @@
-# hs100-status-bar
-A simple status bar app for controlling an HS100 Smart Plug
+HS100 Status Bar App
+===============================================================================
+> A simple status bar app for controlling an HS100 Smart Plug
