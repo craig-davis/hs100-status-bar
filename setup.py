@@ -1,6 +1,6 @@
 from setuptools import setup
 
-APP = ['example_class.py']
+APP = ['ac_control.py']
 DATA_FILES = []
 OPTIONS = {
     'argv_emulation': True,
