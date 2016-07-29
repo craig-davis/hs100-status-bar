@@ -5,7 +5,7 @@ HS100 Status Bar App
 I have a very noise air conditioning unit in my office that I have to turn off
 during conference calls. This is a small menu bar app that can control an HS100
 smart plug. The air conditioner is plugged into the device, and I can now turn it on and off
-with a click. Here is an [affiliate link to Amazon for the HS100 device](http://amzn.to/2ajDxuN).
+with a click.
 
 The app is built with [Rumps](https://github.com/jaredks/rumps). It's a great
 library for putting together status bar apps for OSX. It's really quite easy to
