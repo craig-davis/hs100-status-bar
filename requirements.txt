@@ -1,0 +1,4 @@
+rumps
+pyobjc
+pyobjc-core
+py2app
