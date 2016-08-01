@@ -4,32 +4,48 @@ import rumps
 import socket
 import struct
 import sys
+import threading
+import Queue
+from netaddr import *
 
 # Rumps status bar app
 class AcControlStatusBarApp(rumps.App):
     def __init__(self):
-        super(AcControlStatusBarApp, self).__init__("AC Control", title=None, icon="icon.png")
-        ac = rumps.MenuItem('Air Conditioner')
-        self.menu = [ac]
-        self.api = Hs100Api()
-        response = self.api.query()
-        ac.state = -1 if not response else response['system']['get_sysinfo']['relay_state']
+        super(AcControlStatusBarApp, self).__init__("HS100 Control", title=None, icon="icon.png")
 
-    @rumps.clicked("Air Conditioner")
+        self.apis = {}
+
+        menuitems = []
+        for ip in Helpers.discover():
+            print "Discovered ", ip
+            api = Hs100Api(ip)
+            response = api.query()
+
+            if response:
+                info = response['system']['get_sysinfo']
+                alias = info['alias']
+                state = info['relay_state']
+            else:
+                alias = ip
+                state = -1
+
+            self.apis[alias] = api
+
+            menuitem = rumps.MenuItem(alias, callback=self.onoff)
+            menuitem.state = state
+            menuitems.append(menuitem)
+
+        self.menu = menuitems
+
     def onoff(self, sender):
         sender.state = not sender.state
         command = 'on' if sender.state else 'off'
-        getattr(self.api, command)()
+        api = self.apis[sender.title]
+        getattr(api, command)()
 
 # Simple HS100 Api
 # Based on https://github.com/j05h/hs100
 class Hs100Api():
-    # Discover this from your router. Look for a device name like `HS100`
-    ip = '192.168.1.15'
-
-    # Default TP-Link API port
-    port = 9999
-
     # base64 encoded data to send to the plug to switch it on
     payload_on = "AAAAKtDygfiL/5r31e+UtsWg1Iv5nPCR6LfEsNGlwOLYo4HyhueT9tTu36Lfog=="
 
@@ -41,6 +57,11 @@ class Hs100Api():
 
     # base64 encoded data to query emeter - hs100 doesn't seem to support this in hardware, but the API seems to be there...
     payload_emeter = "AAAAJNDw0rfav8uu3P7Ev5+92r/LlOaD4o76k/6buYPtmPSYuMXlmA=="
+
+    def __init__(self, ip, port = 9999):
+        print "Setting ip and port ", ip , port
+        self.ip   = ip
+        self.port = port
 
     def __getattr__(self, command):
         methods = {
@@ -92,6 +113,67 @@ class Hs100Api():
             code=byte
 
         return json.loads(response)
+
+class Helpers():
+    @staticmethod
+    def find(q, ip, port):
+        result = Helpers.check_port(ip, port)
+
+        if result:
+            q.put(result)
+
+    @staticmethod
+    def discover():
+        ipset = IPSet([Helpers.my_ip() + '/24'])
+
+        print("Discovering devices on {0}".format(ipset))
+
+        q = Queue.Queue()
+
+        threads = []
+        for ip in list(ipset):
+            t = threading.Thread(target=Helpers.find, args=(q, str(ip), 9999))
+            t.daemon = True
+            t.start()
+            threads.append(t)
+
+        for t in threads:
+            t.join()
+
+        ips = []
+        while not q.empty():
+            ips.append(q.get())
+
+        return ips
+
+    @staticmethod
+    def check_port(host, port):
+        captive_dns_addr = ""
+        host_addr = ""
+        try:
+            captive_dns_addr = socket.gethostbyname("BlahThisDomaynDontExist22.com")
+        except:
+            pass
+        try:
+            host_addr = socket.gethostbyname(host)
+            if (captive_dns_addr == host_addr):
+                return False
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(1)
+            s.connect((host, port))
+            s.close()
+        except:
+            return False
+        return host
+
+    @staticmethod
+    def my_ip():
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("gmail.com",80))
+        myip = (s.getsockname()[0])
+        s.close()
+
+        return myip
 
 if __name__ == "__main__":
     AcControlStatusBarApp().run()
